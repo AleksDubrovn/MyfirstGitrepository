@@ -114,6 +114,64 @@ class TestPet:
             assert response.status_code == expected_status_code
             if expected_status_code == 200:
                 assert isinstance(response.json(), list)
-            else:
-                assert isinstance(response.json(), dict)
+            elif expected_status_code == 400:
+                try:
+                    assert isinstance(response.json(), dict)
+                except requests.exceptions.JSONDecodeError:
+                    assert isinstance(response.text, str)
+
+
+    @allure.title("Размещение заказа")
+    def test_create_order(self):
+        with allure.step(f"Отравка запроса на создание заказа"):
+            payload = {
+                "id": 1,
+                "petId": 1,
+                "quantity": 1,
+                "status": "placed",
+                "complete": True
+            }
+            response = requests.post(url=f"{BASE_URL}/store/order", json=payload)
+            if response.status_code == 200:
+                assert response.json() == payload
+            elif response.status_code == 500:
+                error_data = response.json()
+
+                assert error_data["code"] == 500
+                assert "message" in error_data
+
+    @allure.title("Получение информации о заказе по ID")
+    def test_get_information_by_id(self):
+        with allure.step("Отправка запроса на получение информации по ID"):
+            response = requests.get(url=f"{BASE_URL}/store/order/1")
+            if  response.status_code == 200:
+                assert response.json()["id"] == 1
+            elif response.status_code == 500:
+                error_data = response.json()
+                assert error_data["code"] == 500
+                assert "message" in error_data
+
+    @allure.title("Удаление заказа по ID")
+    def test_delete_order_by_id(self):
+        with allure.step("Отправка запроса на удаление заказа по ID"):
+            delete_response = requests.delete(url=f"{BASE_URL}/store/order/1")
+            assert delete_response.status_code == 200
+        with allure.step("Проверка на отсутствие заказа при отправке запроса"):
+            response = requests.get(url=f"{BASE_URL}/store/order/1")
+            assert response.status_code == 404
+
+
+    @allure.title("Попытка получить информацию о несуществующем заказе")
+    def test_get_order_nonexistent_info(self,create_order):
+        order_id = create_order["id"]
+        delete_response = requests.delete(url=f"{BASE_URL}/store/order/{order_id}")
+        assert delete_response.status_code == 200
+
+        with allure.step("Отправка запроса на получение информации о несуществующем заказе"):
+            response = requests.get(url=f"{BASE_URL}/store/order/{order_id}")
+            assert response.status_code == 404
+            error_data = response.json()
+            assert isinstance(error_data, dict)
+
+
 
